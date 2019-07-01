@@ -6,6 +6,10 @@ from kivy.uix.label import Label
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
+from kivy.clock import Clock
+import socket_client
+import os
+import sys
 
 kivy.require("1.11.1")
 
@@ -36,6 +40,18 @@ class ConnectPage(GridLayout):
         
         chat_app.info_page.update_info("Button pressed")
         chat_app.screen_manager.current = 'Info'
+        Clock.schedule_once(self.connect,1)
+
+    def connect(self, _):
+        port = int(self.port.text)
+        ip = self.ip.text
+        username = self.username.text
+
+        if not socket_client.connect(ip, port, username, show_error):
+            return 123
+        
+        chat_app.create_chat_page()
+        chat_app.screen_manager.current = "Chat"
 
 
 class InfoPage(GridLayout):
@@ -53,6 +69,14 @@ class InfoPage(GridLayout):
     def update_text_width(self, *_):
         self.message.text_size = (self.message.width*0.9, None)
 
+
+class ChatPage(GridLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cols = 2
+        self.add_widget(Label(text='Hey we are here'))
+
+
 class EpicApp(App):
     def build(self):
         self.screen_manager = ScreenManager()
@@ -69,6 +93,16 @@ class EpicApp(App):
         
         return self.screen_manager
 
+    def create_chat_page(self):
+        self.chat_page = ChatPage()
+        screen = Screen(name='Chat')
+        screen.add_widget(self.chat_page)
+        self.screen_manager.add_widget(screen)
+
+def show_error(message):
+    chat_app.info_page.update_info(message)
+    chat_app.screen_manager.current = "Info"
+    Clock.schedule_once(sys.exit, 10)
 
 if __name__ == "__main__":
     chat_app = EpicApp()
