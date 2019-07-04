@@ -33,10 +33,19 @@ class ScrollableLabel(ScrollView):
         self.chat_history.text += '\n' + message
 
         self.layout.height = self.chat_history.texture_size[1] + 15
-        self.layout.chat_history.height = self.chat_history.texture_size[1]
-        self.layout.chat_history.text_size = (self.chat_history.width*0.98, None)
+        self.chat_history.height = self.chat_history.texture_size[1]
+        self.chat_history.text_size = (self.chat_history.width*0.98, None)
 
         self.scroll_to(self.scroll_to_point)
+
+    def update_chat_history_layout(self, _=None):
+        # Set layout height to whatever height of chat history text is + 15 pixels
+        # (adds a bit of space at the bottom)
+        # Set chat history label to whatever height of chat history text is
+        # Set width of chat history text to 98 of the label width (adds small margins)
+        self.layout.height = self.chat_history.texture_size[1] + 15
+        self.chat_history.height = self.chat_history.texture_size[1]
+        self.chat_history.text_size = (self.chat_history.width * 0.98, None)
 
 
 class ConnectPage(GridLayout):
@@ -100,7 +109,7 @@ class ChatPage(GridLayout):
         super().__init__(**kwargs)
         self.cols = 1
         self.rows = 2
-        self.history = Label(height=Window.size[1]*0.9,size_hint_y=None)
+        self.history = ScrollableLabel(height=Window.size[1]*0.9,size_hint_y=None)
         self.add_widget(self.history)
 
         self.new_message = TextInput(width=Window.size[1]*0.9,size_hint_x=None,multiline=False)
@@ -112,8 +121,51 @@ class ChatPage(GridLayout):
         bottom_line.add_widget(self.send)
         self.add_widget(bottom_line)
 
+        Window.bind(on_key_down=self.on_key_down)
+
+        Clock.schedule_once(self.focus_text_input, 1)
+        socket_client.start_listening(self.incoming_message, show_error)
+        self.bind(size=self.adjust_fields)
+
+
+    def adjust_fields(self, *_):
+        # Chat history height - 90%, but at least 50px for bottom new message/send button part
+        if Window.size[1] * 0.1 < 50:
+            new_height = Window.size[1] - 50
+        else:
+            new_height = Window.size[1] * 0.9
+        self.history.height = new_height
+
+        # New message input width - 80%, but at least 160px for send button
+        if Window.size[0] * 0.2 < 160:
+            new_width = Window.size[0] - 160
+        else:
+            new_width = Window.size[0] * 0.8
+        self.new_message.width = new_width
+
+        # Update chat history layout
+        #self.history.update_chat_history_layout()
+        Clock.schedule_once(self.history.update_chat_history_layout, 0.01)
+
+    def on_key_down(self, instance, keyboard, keycode, text, modifires):
+        if keycode == 40:
+            self.send_message(None)
+
     def send_message(self,_):
+        message = self.new_message.text
+        self.new_message.text = ""
+        if message:
+            self.history.update_chat_history(f"[color=dd2020]{chat_app.connect_page.username.text}[/color] > {message}")
+            socket_client.send(message)
+        
+        Clock.schedule_once(self.focus_text_input, 0.1)
         print('send a message')
+
+    def focus_text_input(self,_):
+        self.new_message.focus = True
+
+    def incoming_message(self, username, message):
+        self.history.update_chat_history(f"[color=20dd20]{username}[/color] > {message}")
 
 
 class EpicApp(App):
